@@ -1,0 +1,9 @@
+- Bronze:
+    - **Read raw files** (csv/xlsx) from HDFS with explicit schema.
+    - Rename column headers, count number of nulls.
+    - Commit the tables to Delta Lake:
+        - `bronze_telco_demographics`
+        - `bronze_telco_location`
+        - `bronze_telco_population`
+        - `bronze_telco_services`
+        - `bronze_telco_status`
