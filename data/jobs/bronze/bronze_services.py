@@ -1,55 +1,55 @@
 # data/jobs/bronze/bronze_services.py
+import argparse
 from pyspark.sql import SparkSession, functions as F
 
-RAW_PATH   = "hdfs://localhost:9000/data/raw/telco/services/Telco_customer_churn_services.csv"
-DELTA_PATH = "hdfs:///data/delta/bronze/telco_services"
+def spark(app):
+    return (
+        SparkSession.builder
+        .appName(app)
+        # Delta Lake integration
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+        # HDFS endpoint (from docker-compose: hdfs-namenode on port 9000)
+        .config("spark.hadoop.fs.defaultFS", "hdfs://hdfs-namenode:9000")
+        # small local-friendly shuffle
+        .config("spark.sql.shuffle.partitions", "8")
+        .getOrCreate()
+    )
 
-spark = (
-    SparkSession.builder
-    .appName("telco_bronze_services")
-    .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
-    .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
-    # avoid Spark 3 “ancient datetime” Parquet error
-    .config("spark.sql.parquet.datetimeRebaseModeInWrite", "CORRECTED")
-    .config("spark.sql.parquet.int96RebaseModeInWrite", "CORRECTED")
-    .getOrCreate()
-)
+def main(ingest_date: str, out_path: str):
+    s = spark("bronze-delta-sanity")
 
-# quick delimiter guess from first line
-first = spark.read.text(RAW_PATH).head()[0]
-cands = [",", ";", "\t", "|"]
-delim = max(cands, key=lambda d: len(first.split(d)))
-print("Using delimiter:", repr(delim))
+    # --- 1) tiny in-memory DataFrame -----------------------------------------
+    df = s.createDataFrame(
+        [
+            ("a001", "Alice", 29),
+            ("b002", "Bob",   41),
+            ("c003", "Cara",  35),
+        ],
+        ["customerID", "name", "age"]
+    ).withColumn("ingest_date", F.lit(ingest_date))
 
-df = (
-    spark.read
-    .option("header", True)
-    .option("sep", delim)
-    .option("quote", '"')
-    .option("escape", '"')
-    .option("multiLine", True)
-    .option("ignoreLeadingWhiteSpace", True)
-    .option("ignoreTrailingWhiteSpace", True)
-    .option("mode", "PERMISSIVE")
-    .option("badRecordsPath", "hdfs:///tmp/badrecords/telco_services")
-    .csv(RAW_PATH)                   # no explicit schema
-)
+    # --- 2) write as Delta to HDFS -------------------------------------------
+    (df.write
+        .format("delta")
+        .mode("append")
+        .partitionBy("ingest_date")
+        .save(out_path))
 
-# normalize column names a bit (lowercase + underscores)
-for c in df.columns:
-    df = df.withColumnRenamed(c, "_".join(c.strip().lower().split()))
+    print(f"✅ Wrote Delta table → {out_path} (ingest_date={ingest_date})")
 
-# guarantee modern load_date to avoid ancient-date write issues
-df = df.withColumn("load_date", F.current_date())
+    # --- 3) read back & show --------------------------------------------------
+    back = s.read.format("delta").load(out_path)
+    print("🔎 Read-back sample:")
+    back.where(F.col("ingest_date") == ingest_date).show(truncate=False)
 
-print("INPUT ROWS:", df.count())
-
-(df.write
-    .format("delta")
-    .mode("overwrite")
-    .option("overwriteSchema", "true")
-    .save(DELTA_PATH)
-)
-
-print("WROTE DELTA TO", DELTA_PATH)
-spark.stop()
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--ingest_date", required=True, help="YYYY-MM-DD")
+    ap.add_argument(
+        "--out_path",
+        default="hdfs://hdfs-namenode:9000/data/delta/bronze/telco/services",
+        help="Delta output path on HDFS",
+    )
+    args = ap.parse_args()
+    main(args.ingest_date, args.out_path)
