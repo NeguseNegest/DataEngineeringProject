@@ -12,16 +12,16 @@
 
 #### Docker
 
-´´´
+```
 docker compose pull
 docker compose up -d
 
 
-´´´
+```
 
 #### HDFS folders
 
-´´´ 
+``` 
 ##### Create target layout
 docker exec -it hdfs-namenode hdfs dfs -mkdir -p /data/delta/{bronze,silver,gold}/telco
 
@@ -32,11 +32,11 @@ docker exec -it hdfs-namenode hdfs dfs -chmod -R 775 /data/delta
 ##### Verify
 docker exec -it hdfs-namenode hdfs dfs -ls -R /data/delta
 
-´´´
+```
 
 ##### Check everything is in order
 
-´´´
+```
 # Create a tiny test script inside the spark-master container
 docker exec -it spark-master bash -lc 'cat > /tmp/spark_smoke.py << "PY"
 from pyspark.sql import SparkSession
@@ -62,4 +62,4 @@ docker exec -it spark-master /opt/spark/bin/spark-submit \
   --conf spark.hadoop.fs.defaultFS=hdfs://hdfs-namenode:9000 \
   /tmp/spark_smoke.py
 
-´´´
+```
