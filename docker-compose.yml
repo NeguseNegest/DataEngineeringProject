@@ -7,15 +7,17 @@ services:
     environment:
       - CLUSTER_NAME=local-hadoop
       - CORE_CONF_fs_defaultFS=hdfs://hdfs-namenode:9000
-      - HDFS_CONF_dfs.namenode.rpc-address=hdfs-namenode:9000
-      - HDFS_CONF_dfs.namenode.servicerpc-address=hdfs-namenode:9000
+      - HDFS_CONF_dfs_namenode_rpc_address=hdfs-namenode:9000
+      - HDFS_CONF_dfs_namenode_servicerpc_address=hdfs-namenode:9000
+      - HDFS_CONF_dfs_namenode_name_dir=file:///hadoop/dfs/name
+      - HDFS_CONF_dfs_replication=1
     ports:
-      - "9870:9870"   # HDFS NameNode UI
+      - "9870:9870"   # NameNode UI
       - "9000:9000"   # NameNode RPC
     volumes:
       - nn-data:/hadoop/dfs/name
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9870"]
+      test: ["CMD", "curl", "-sf", "http://localhost:9870"]  # -s to be quiet, -f to fail on 4xx/5xx
       interval: 10s
       timeout: 5s
       retries: 30
@@ -26,6 +28,7 @@ services:
     container_name: hdfs-datanode
     environment:
       - CORE_CONF_fs_defaultFS=hdfs://hdfs-namenode:9000
+      - SERVICE_PRECONDITION=hdfs-namenode:9870   # wait for NN UI to be up
     depends_on:
       - hdfs-namenode
     ports:
