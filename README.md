@@ -47,7 +47,7 @@ spark = (SparkSession.builder
     .config("spark.hadoop.fs.defaultFS","hdfs://hdfs-namenode:9000")
     .getOrCreate())
 print("Spark version:", spark.version, "| count =", spark.range(5).count())
-print("OK ✅ Spark up; stopping.")
+print("OK  Spark up; stopping.")
 spark.stop()
 PY'
 
