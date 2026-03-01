@@ -51,7 +51,7 @@ print("OK  Spark up; stopping.")
 spark.stop()
 PY'
 
-# Submit (includes Delta jars so your session matches real runs)
+# Submit (includes Delta jars so the session matches real runs)
 docker exec -it spark-master /opt/spark/bin/spark-submit \
   --master spark://spark-master:7077 \
   --deploy-mode client \
